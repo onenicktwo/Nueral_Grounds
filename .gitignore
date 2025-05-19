@@ -72,12 +72,12 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 # Python / RL
-rl_backend/.venv/
-rl_backend/__pycache__/
+Python/.venv/
+Python/__pycache__/
 *.pyc
 # PyInstaller build artefacts
-rl_backend/build/
-rl_backend/dist/
+Python/build/
+Python/dist/
 # Model files
 *.onnx
 *.pth
