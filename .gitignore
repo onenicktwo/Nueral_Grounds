@@ -70,3 +70,14 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Python / RL
+rl_backend/.venv/
+rl_backend/__pycache__/
+*.pyc
+# PyInstaller build artefacts
+rl_backend/build/
+rl_backend/dist/
+# Model files
+*.onnx
+*.pth
