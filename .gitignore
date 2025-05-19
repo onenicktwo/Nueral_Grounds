@@ -71,13 +71,35 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
-# Python / RL
-Python/.venv/
-Python/__pycache__/
-*.pyc
-# PyInstaller build artefacts
-Python/build/
-Python/dist/
-# Model files
+######################################
+# ML-Agents / RL runtime              #
+######################################
+# Entire embedded Python environment
+Assets/StreamingAssets/MLRuntime/
+
+# On-the-fly trainer output
+Assets/StreamingAssets/results/
+Assets/StreamingAssets/*.onnx
+
+######################################
+# Large native libs & checkpoints     #
+######################################
+*.dll
+*.dylib
+*.so
 *.onnx
+*.ckpt
 *.pth
+*.pkl
+
+######################################
+# Backup / OS files                   #
+######################################
+*.bak
+*.old
+*.orig
+*.swp
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
