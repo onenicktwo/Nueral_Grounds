@@ -1,7 +1,5 @@
-using System;
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody))]
 public class AgentController : MonoBehaviour
 {
     [Header("Movement")]
@@ -12,23 +10,17 @@ public class AgentController : MonoBehaviour
     [Tooltip("If TRUE player keyboard. If FALSE external action (RL/Python).")]
     public bool heuristic = true;
 
-    private Rigidbody rb;
     private Vector3 desiredDir = Vector3.zero;
-
-    private void Awake() => rb = GetComponent<Rigidbody>();
 
     private void Update()
     {
-        if (!heuristic) return;
-        ReadKeyboardInput();
-    }
+        if (heuristic)
+        {
+            ReadKeyboardInput();
+        }
 
-    private void FixedUpdate()
-    {
         MoveAgent();
     }
-
-    public void EnableHeuristic() => heuristic = true;
 
     private void ReadKeyboardInput()
     {
@@ -39,16 +31,13 @@ public class AgentController : MonoBehaviour
 
     private void MoveAgent()
     {
-        Vector3 targetVel = desiredDir * moveSpeed;
-        Vector3 velocityChange = targetVel - rb.velocity;
-        velocityChange.y = 0;
-        rb.AddForce(velocityChange, ForceMode.VelocityChange);
-
         if (desiredDir.sqrMagnitude > 0.001f)
         {
-            Quaternion targetRot = Quaternion.LookRotation(desiredDir, Vector3.up);
-            Quaternion newRot = Quaternion.RotateTowards(rb.rotation, targetRot, turnSpeed * Time.fixedDeltaTime);
-            rb.MoveRotation(newRot);
+            Vector3 move = desiredDir * moveSpeed * Time.deltaTime;
+            transform.Translate(move, Space.World);
+
+            Quaternion targetRotation = Quaternion.LookRotation(desiredDir, Vector3.up);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
         }
     }
 }
