@@ -31,6 +31,7 @@ public class ESAgent : MonoBehaviour
         DesiredDirection = Vector3.zero;
 
         if (!rb) rb = GetComponent<Rigidbody>();
+        rb.velocity = Vector3.zero;
 
         StartCoroutine(RunEpisode());
     }
@@ -66,13 +67,13 @@ public class ESAgent : MonoBehaviour
 
     Vector2 LinearPolicy(float[] o)
     {
-        float vx = 0, vz = 0;
+        float vx_policy = 0, vz_policy = 0;
         for (int i = 0; i < OBS; i++)
         {
-            vx += weights[i] * o[i];
-            vz += weights[i + OBS] * o[i];
+            vx_policy += weights[i] * o[i];
+            vz_policy += weights[i + OBS] * o[i];
         }
 
-        return new Vector2(tanh(vx), tanh(vz));
+        return new Vector2(tanh(vx_policy), tanh(vz_policy));
     }
 }

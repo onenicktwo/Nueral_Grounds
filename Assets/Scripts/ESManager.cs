@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -80,6 +80,7 @@ public class ESManager : MonoBehaviour
                 mu[p] = elite.Average(e => e.w[p]);
                 std[p] = Mathf.Sqrt(elite.Average(e => Mathf.Pow(e.w[p] - mu[p], 2)));
             }
+            Debug.Log($"Gen {generation} - Std[0]: {std[0]}, Std[1]: {std[1]}, Mu[0]: {mu[0]}");
         }
     }
 
@@ -104,10 +105,10 @@ public class ESManager : MonoBehaviour
 
     void PositionAgent(ESAgent ag, int idx)
     {
-        float radius = 5f;
-        float angle = idx * Mathf.PI * 2f / PopSize;
-        Vector3 pos = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * radius;
-        ag.transform.position = pos;
+        //float radius = 5f;
+        //float angle = idx * Mathf.PI * 2f / PopSize;
+        //Vector3 pos = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * radius;
+        ag.transform.position = pool.transform.position;
     }
 
     void ResetTraining()
