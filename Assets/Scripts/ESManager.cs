@@ -16,6 +16,8 @@ public class ESManager : MonoBehaviour
     [SerializeField] Button resetBtn;
     [SerializeField] Text genText;
 
+    const float MIN_STD = 0.05f;
+
     float[] mu = new float[ESAgent.PARAM];
     float[] std = Enumerable.Repeat(1f, ESAgent.PARAM).ToArray();
 
@@ -78,9 +80,13 @@ public class ESManager : MonoBehaviour
             for (int p = 0; p < ESAgent.PARAM; p++)
             {
                 mu[p] = elite.Average(e => e.w[p]);
-                std[p] = Mathf.Sqrt(elite.Average(e => Mathf.Pow(e.w[p] - mu[p], 2)));
+
+                float var = elite.Average(e => Mathf.Pow(e.w[p] - mu[p], 2));
+
+                std[p] = Mathf.Sqrt(var + 1e-9f);
+
+                if (std[p] < MIN_STD) std[p] = MIN_STD;
             }
-            Debug.Log($"Gen {generation} - Std[0]: {std[0]}, Std[1]: {std[1]}, Mu[0]: {mu[0]}");
         }
     }
 
@@ -98,7 +104,7 @@ public class ESManager : MonoBehaviour
     static float RandomNormal()
     {
         // Box-Muller polar
-        float u1 = 1f - Random.value;
+        float u1 = Mathf.Clamp01(1f - Random.value + 1e-7f);
         float u2 = 1f - Random.value;
         return Mathf.Sqrt(-2f * Mathf.Log(u1)) * Mathf.Sin(2f * Mathf.PI * u2);
     }
