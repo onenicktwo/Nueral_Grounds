@@ -154,7 +154,7 @@ GameObject:
   - component: {fileID: 8949317090971506112}
   - component: {fileID: 5691633158784264277}
   - component: {fileID: 2527904802114216945}
-  - component: {fileID: 924528509481018013}
+  - component: {fileID: 151914317448032204}
   m_Layer: 6
   m_Name: Agent
   m_TagString: Untagged
@@ -291,7 +291,7 @@ Rigidbody:
   m_Interpolate: 1
   m_Constraints: 84
   m_CollisionDetection: 1
---- !u!114 &924528509481018013
+--- !u!114 &151914317448032204
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

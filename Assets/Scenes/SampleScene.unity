@@ -582,8 +582,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: EmbeddedTrainer, Assembly-CSharp
-        m_MethodName: StopTraining
+        m_TargetAssemblyTypeName: ESManager, Assembly-CSharp
+        m_MethodName: StopRun
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1104,8 +1104,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: EmbeddedTrainer, Assembly-CSharp
-        m_MethodName: StartTraining
+        m_TargetAssemblyTypeName: ESManager, Assembly-CSharp
+        m_MethodName: StartRun
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1164,7 +1164,7 @@ GameObject:
   - component: {fileID: 1130984466}
   m_Layer: 0
   m_Name: Goal
-  m_TagString: Untagged
+  m_TagString: Goal
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1472,7 +1472,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1757488591}
-  - component: {fileID: 1757488590}
+  - component: {fileID: 1757488592}
   m_Layer: 0
   m_Name: Manager
   m_TagString: Untagged
@@ -1480,24 +1480,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1757488590
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1757488589}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e1fa0d0ce7a96f048b3139b52640f21b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  goal: {fileID: 1130984466}
-  pool: {fileID: 1928870273}
-  popSlider: {fileID: 40917678}
-  startBtn: {fileID: 1034775180}
-  resetBtn: {fileID: 776614526}
-  genText: {fileID: 962435591}
 --- !u!4 &1757488591
 Transform:
   m_ObjectHideFlags: 0
@@ -1513,6 +1495,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1757488592
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1757488589}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1fa0d0ce7a96f048b3139b52640f21b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  startBtn: {fileID: 1034775180}
+  stopBtn: {fileID: 776614526}
+  popSlider: {fileID: 40917678}
+  genText: {fileID: 962435591}
+  agentPrefab: {fileID: 1323119419020391276, guid: 363e16681df395c4bbe6a8b777c421c8, type: 3}
+  agentParent: {fileID: 1928870272}
+  target: {fileID: 1130984466}
+  sigma: 0.1
+  alpha: 0.05
+  inputDim: 4
+  outputDim: 2
 --- !u!1 &1928870271
 GameObject:
   m_ObjectHideFlags: 0
@@ -1522,7 +1527,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1928870272}
-  - component: {fileID: 1928870273}
   m_Layer: 0
   m_Name: Pool
   m_TagString: Untagged
@@ -1545,19 +1549,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1928870273
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1928870271}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e7a2d2f7a5349524fa3cc8c672576dd3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  agentPrefab: {fileID: 1323119419020391276, guid: 363e16681df395c4bbe6a8b777c421c8, type: 3}
 --- !u!1 &1958411551
 GameObject:
   m_ObjectHideFlags: 0

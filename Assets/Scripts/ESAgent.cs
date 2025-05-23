@@ -1,79 +1,52 @@
-using UnityEngine;
-using System.Collections;
-using Unity.Mathematics;
-using static Unity.Mathematics.math;
+﻿using UnityEngine;
 
+[RequireComponent(typeof(AgentController))]
 public class ESAgent : MonoBehaviour
 {
-    public const int OBS = 4; // observations: dx, dz, vx, vz
-    public const int ACT = 2; // actions: x, z normalized dir
-    public const int PARAM = OBS * ACT;
+    AgentController mover;
+    Vector3 targetPos;
 
     float[] weights;
+    int inputDim, outputDim;
 
-    public Vector3 DesiredDirection { get; private set; }
+    public float Fitness { get; private set; }
+    public bool Done { get; private set; }
 
-    ESManager trainer;
-    Transform goal;
-    Rigidbody rb;
+    const float MaxEpisodeTime = 10f;
+    float timer;
 
-    int step, maxStep = 200;
-    float episodeReturn;
-
-    public void Init(ESManager mgr, Transform goalTf, float[] w)
+    public void Init(float[] w, Vector3 target, int inDim, int outDim)
     {
-        trainer = mgr;
-        goal = goalTf;
         weights = w;
-
-        step = 0;
-        episodeReturn = 0f;
-        DesiredDirection = Vector3.zero;
-
-        if (!rb) rb = GetComponent<Rigidbody>();
-        rb.velocity = Vector3.zero;
-
-        StartCoroutine(RunEpisode());
+        targetPos = target;
+        inputDim = inDim;
+        outputDim = outDim;
+        mover = GetComponent<AgentController>();
+        mover.ResetAgent(Vector3.zero);
+        Done = false;
+        timer = 0f;
+        Fitness = 0f;
     }
 
-    IEnumerator RunEpisode()
+    void FixedUpdate()
     {
-        while (step < maxStep)
-        {
-            step++;
+        if (Done) return;
 
-            float[] obs = GetObs();
-            Vector2 act = LinearPolicy(obs);
-            DesiredDirection = new Vector3(act.x, 0, act.y).normalized;
+        // 1) Build observation  (distance + own velocity)
+        Vector3 toTgt = (targetPos - transform.position);
+        float[] obs = { toTgt.x, toTgt.z, mover.GetComponent<Rigidbody>().velocity.x, mover.GetComponent<Rigidbody>().velocity.z };
 
-            yield return new WaitForFixedUpdate();
+        // 2) Policy -> action
+        float[] act = LinearPolicy.Forward(weights, obs, inputDim, outputDim);
+        Vector3 dir = new Vector3(act[0], 0, act[1]).normalized;
+        mover.DesiredDirection = dir;
 
-            bool done = Vector3.Distance(transform.position, goal.position) < 0.6f;
-            episodeReturn += done ? +1f : -0.005f; // reward
+        // 3) Incremental reward  (negative distance each physics step)
+        Fitness -= toTgt.magnitude * Time.fixedDeltaTime;
 
-            if (done) break;
-        }
-
-        trainer.EpisodeFinished(this, episodeReturn);
-    }
-
-    float[] GetObs()
-    {
-        Vector3 toGoal = goal.position - transform.position;
-        float vx = rb ? rb.velocity.x : 0f;
-        float vz = rb ? rb.velocity.z : 0f;
-        return new[] { toGoal.x, toGoal.z, vx, vz };
-    }
-
-    Vector2 LinearPolicy(float[] o)
-    {
-        float vx_policy = 0, vz_policy = 0;
-        for (int i = 0; i < OBS; i++)
-        {
-            vx_policy += weights[i] * o[i];
-            vz_policy += weights[i + OBS] * o[i];
-        }
-
-        return new Vector2(tanh(vx_policy), tanh(vz_policy));
+        // 4) Terminate?
+        timer += Time.fixedDeltaTime;
+        if (timer > MaxEpisodeTime)
+            Done = true;
     }
 }

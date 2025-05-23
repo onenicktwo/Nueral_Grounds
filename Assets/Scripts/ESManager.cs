@@ -1,133 +1,143 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
 
 public class ESManager : MonoBehaviour
 {
-    [Header("Scene refs")]
-    [SerializeField] Transform goal;
-    [SerializeField] AgentPool pool;
-
-    [Header("UI refs")]
-    [SerializeField] Slider popSlider;
+    [Header("UI")]
     [SerializeField] Button startBtn;
-    [SerializeField] Button resetBtn;
+    [SerializeField] Button stopBtn;
+    [SerializeField] Slider popSlider;
     [SerializeField] Text genText;
 
-    const float MIN_STD = 0.05f;
+    [Header("References")]
+    [SerializeField] GameObject agentPrefab;
+    [SerializeField] Transform agentParent;
+    [SerializeField] Transform target;
 
-    float[] mu = new float[ESAgent.PARAM];
-    float[] std = Enumerable.Repeat(1f, ESAgent.PARAM).ToArray();
+    [Header("Hyper-parameters")]
+    [SerializeField] float sigma = 0.1f;         // exploration noise
+    [SerializeField] float alpha = 0.05f;        // learning-rate
+    [SerializeField] int inputDim = 4;
+    [SerializeField] int outputDim = 2;
+
+    float[] θ;                     // master weights
+    int paramCount;
+    List<ESAgent> population = new();
 
     int generation;
-    bool isTraining;
-
-    public delegate void EpisodeEvent(ESAgent ag, float score);
-    event EpisodeEvent OnEpisodeFinished;
+    bool running;
+    Coroutine trainLoop;
 
     void Awake()
     {
+        paramCount = LinearPolicy.ParamCount(inputDim, outputDim);
+        θ = new float[paramCount];
+
         startBtn.onClick.AddListener(() =>
         {
-            if (!isTraining) StartCoroutine(TrainLoop());
+            if (!running) trainLoop = StartCoroutine(TrainingLoop());
         });
-        resetBtn.onClick.AddListener(ResetTraining);
+        stopBtn.onClick.AddListener(ResetAll);
+
+        popSlider.value = 50;
+        UpdateGenText();
     }
 
-    int PopSize => (int)popSlider.value;
-    int Elite => Mathf.Max(2, PopSize / 8);
-
-    IEnumerator TrainLoop()
+    IEnumerator TrainingLoop()
     {
-        isTraining = true;
-        generation = 0;
-
-        while (isTraining)
+        running = true;
+        while (running)
         {
+            int popSize = Mathf.RoundToInt(popSlider.value);
+            SpawnPopulation(popSize);
+            yield return EvaluatePopulation();   // waits until everyone Done
+            UpdateMaster(); // gradient ascent
+            Cleanup();
             generation++;
-            genText.text = $"Gen {generation} / Pop {PopSize}";
-            var results = new List<(float[] w, float score)>();
-
-            // 1. Sample population
-            for (int i = 0; i < PopSize; i++)
-            {
-                float[] w = SampleWeights();
-                ESAgent ag = pool.Get();
-                PositionAgent(ag, i);
-
-                // subscribe once
-                void Handler(ESAgent a, float s)
-                {
-                    if (a != ag) return;
-                    results.Add((w, s));
-                    OnEpisodeFinished -= Handler;
-                    pool.Recycle(a);
-                }
-                OnEpisodeFinished += Handler;
-
-                ag.Init(this, goal, w);
-            }
-
-            // 2. Wait until all results are back
-            while (results.Count < PopSize) yield return null;
-
-            // 3. Elite select + update
-            results.Sort((a, b) => b.score.CompareTo(a.score));
-            var elite = results.Take(Elite).ToArray();
-
-            for (int p = 0; p < ESAgent.PARAM; p++)
-            {
-                mu[p] = elite.Average(e => e.w[p]);
-
-                float var = elite.Average(e => Mathf.Pow(e.w[p] - mu[p], 2));
-
-                std[p] = Mathf.Sqrt(var + 1e-9f);
-
-                if (std[p] < MIN_STD) std[p] = MIN_STD;
-            }
+            UpdateGenText();
         }
     }
 
-    public void EpisodeFinished(ESAgent ag, float score) =>
-        OnEpisodeFinished?.Invoke(ag, score);
-
-    float[] SampleWeights()
+    void SpawnPopulation(int n)
     {
-        var w = new float[ESAgent.PARAM];
-        for (int i = 0; i < w.Length; i++)
-            w[i] = mu[i] + std[i] * RandomNormal();
-        return w;
+        population.Clear();
+        for (int i = 0; i < n; i++)
+        {
+            // 1) sample noise
+            float[] ε = new float[paramCount];
+            for (int k = 0; k < paramCount; k++) ε[k] = Random.Range(-1f, 1f);
+
+            // 2) θ_i = θ + sig * epsil
+            float[] θ_i = new float[paramCount];
+            for (int k = 0; k < paramCount; k++) θ_i[k] = θ[k] + sigma * ε[k];
+
+            // 3) store epsil as we’ll need it to compute gradient
+            GameObject go = Instantiate(agentPrefab, agentParent);
+            ESAgent agent = go.GetComponent<ESAgent>();
+            agent.Init(θ_i, target.position, inputDim, outputDim);
+            population.Add(agent);
+            noiseBank.Add(ε);
+        }
     }
 
-    static float RandomNormal()
+    // stores noise for gradient calc
+    List<float[]> noiseBank = new();
+
+    IEnumerator EvaluatePopulation()
     {
-        // Box-Muller polar
-        float u1 = Mathf.Clamp01(1f - Random.value + 1e-7f);
-        float u2 = 1f - Random.value;
-        return Mathf.Sqrt(-2f * Mathf.Log(u1)) * Mathf.Sin(2f * Mathf.PI * u2);
+        // naive: just wait until every agent signals Done
+        bool allDone;
+        do
+        {
+            allDone = true;
+            foreach (var a in population)
+                if (!a.Done) { allDone = false; break; }
+            yield return null;
+        } while (!allDone);
     }
 
-    void PositionAgent(ESAgent ag, int idx)
+    void UpdateMaster()
     {
-        //float radius = 5f;
-        //float angle = idx * Mathf.PI * 2f / PopSize;
-        //Vector3 pos = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * radius;
-        ag.transform.position = pool.transform.position;
+        // canonical ES gradient estimate
+        int n = population.Count;
+        float[] grad = new float[paramCount];
+
+        // normalise returns (rank or std) – here: simple mean/std
+        float mean = 0, var = 0;
+        foreach (var a in population) mean += a.Fitness;
+        mean /= n;
+        foreach (var a in population) var += Mathf.Pow(a.Fitness - mean, 2);
+        float std = Mathf.Sqrt(var / n) + 1e-8f;
+
+        for (int i = 0; i < n; i++)
+        {
+            float normR = (population[i].Fitness - mean) / std;
+            float[] ε = noiseBank[i];
+            for (int k = 0; k < paramCount; k++)
+                grad[k] += normR * ε[k];
+        }
+        for (int k = 0; k < paramCount; k++)
+            θ[k] += (alpha / (n * sigma)) * grad[k];   // gradient ascent step
     }
 
-    void ResetTraining()
+    void Cleanup()
     {
-        StopAllCoroutines();
-        isTraining = false;
+        foreach (var a in population)
+            Destroy(a.gameObject);
+        noiseBank.Clear();
+    }
+
+    void ResetAll()
+    {
+        if (trainLoop != null) StopCoroutine(trainLoop);
+        Cleanup();
+        running = false;
         generation = 0;
-        mu = new float[ESAgent.PARAM];
-        std = Enumerable.Repeat(1f, ESAgent.PARAM).ToArray();
-        genText.text = "Ready";
-
-        // deactivate any live agents
-        foreach (Transform child in pool.transform)
-            child.gameObject.SetActive(false);
+        θ = new float[paramCount];
+        UpdateGenText();
     }
+    void UpdateGenText() => genText.text = $"Gen: {generation}";
 }
