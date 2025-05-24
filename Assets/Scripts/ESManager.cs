@@ -23,9 +23,11 @@ public class ESManager : MonoBehaviour
     [SerializeField] int inputDim = 4;
     [SerializeField] int outputDim = 2;
 
-    float[] θ;                     // master weights
+    IPolicy masterPolicy;
+    float[] theta;
     int paramCount;
-    List<ESAgent> population = new();
+    readonly List<ESAgent> population = new();
+    readonly List<float[]> noiseBank = new();
 
     int generation;
     bool running;
@@ -33,8 +35,9 @@ public class ESManager : MonoBehaviour
 
     void Awake()
     {
-        paramCount = LinearPolicy.ParamCount(inputDim, outputDim);
-        θ = new float[paramCount];
+        masterPolicy = new LinearPolicy(inputDim, outputDim);
+        paramCount = masterPolicy.ParamCount;
+        theta = new float[paramCount];
 
         startBtn.onClick.AddListener(() =>
         {
@@ -64,27 +67,26 @@ public class ESManager : MonoBehaviour
     void SpawnPopulation(int n)
     {
         population.Clear();
+        noiseBank.Clear();
+
         for (int i = 0; i < n; i++)
         {
-            // 1) sample noise
-            float[] ε = new float[paramCount];
-            for (int k = 0; k < paramCount; k++) ε[k] = Random.Range(-1f, 1f);
+            float[] epsilon = new float[paramCount];
+            for (int k = 0; k < paramCount; k++) epsilon[k] = Random.Range(-1f, 1f);
 
-            // 2) θ_i = θ + sig * epsil
-            float[] θ_i = new float[paramCount];
-            for (int k = 0; k < paramCount; k++) θ_i[k] = θ[k] + sigma * ε[k];
+            float[] theta_i = new float[paramCount];
+            for (int k = 0; k < paramCount; k++) theta_i[k] = theta[k] + sigma * epsilon[k];
 
-            // 3) store epsil as we’ll need it to compute gradient
+            IPolicy childPolicy = new LinearPolicy(inputDim, outputDim);
+            childPolicy.SetParams(theta_i);
+
             GameObject go = Instantiate(agentPrefab, agentParent);
             ESAgent agent = go.GetComponent<ESAgent>();
-            agent.Init(θ_i, target.position, inputDim, outputDim);
+            agent.Init(childPolicy, theta_i);
             population.Add(agent);
-            noiseBank.Add(ε);
+            noiseBank.Add(epsilon);
         }
     }
-
-    // stores noise for gradient calc
-    List<float[]> noiseBank = new();
 
     IEnumerator EvaluatePopulation()
     {
@@ -107,20 +109,22 @@ public class ESManager : MonoBehaviour
 
         // normalise returns (rank or std) – here: simple mean/std
         float mean = 0, var = 0;
-        foreach (var a in population) mean += a.Fitness;
+        foreach (var a in population) mean += a.CumulativeReward;
         mean /= n;
-        foreach (var a in population) var += Mathf.Pow(a.Fitness - mean, 2);
+        foreach (var a in population) var += Mathf.Pow(a.CumulativeReward - mean, 2);
         float std = Mathf.Sqrt(var / n) + 1e-8f;
 
         for (int i = 0; i < n; i++)
         {
-            float normR = (population[i].Fitness - mean) / std;
-            float[] ε = noiseBank[i];
+            float normR = (population[i].CumulativeReward - mean) / std;
+            float[] epsilon = noiseBank[i];
             for (int k = 0; k < paramCount; k++)
-                grad[k] += normR * ε[k];
+                grad[k] += normR * epsilon[k];
         }
         for (int k = 0; k < paramCount; k++)
-            θ[k] += (alpha / (n * sigma)) * grad[k];   // gradient ascent step
+            theta[k] += (alpha / (n * sigma)) * grad[k];   // gradient ascent step
+
+        masterPolicy.SetParams(theta);
     }
 
     void Cleanup()
@@ -128,6 +132,7 @@ public class ESManager : MonoBehaviour
         foreach (var a in population)
             Destroy(a.gameObject);
         noiseBank.Clear();
+        population.Clear();
     }
 
     void ResetAll()
@@ -136,7 +141,9 @@ public class ESManager : MonoBehaviour
         Cleanup();
         running = false;
         generation = 0;
-        θ = new float[paramCount];
+        theta = new float[paramCount];
+        masterPolicy.SetParams(theta);
+
         UpdateGenText();
     }
     void UpdateGenText() => genText.text = $"Gen: {generation}";
