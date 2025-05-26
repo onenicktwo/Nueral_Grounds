@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
@@ -13,15 +14,18 @@ public class ESManager : MonoBehaviour
     [SerializeField] Text genText;
 
     [Header("References")]
-    [SerializeField] GameObject agentPrefab;
+    [SerializeField] GameObject agentPrefab; // Not an actual prefab, but acts like one
     [SerializeField] Transform agentParent;
     [SerializeField] Transform target;
 
     [Header("Hyper-parameters")]
     [SerializeField] float sigma = 0.1f;         // exploration noise
     [SerializeField] float alpha = 0.05f;        // learning-rate
-    [SerializeField] int inputDim = 4;
-    [SerializeField] int outputDim = 2;
+    int inputDim = 0;
+    [SerializeField]  int outputDim = 2; // for now assume only x,z movement
+
+    public MonoBehaviour[] obsProviders;
+    public MonoBehaviour[] rewProviders;
 
     IPolicy masterPolicy;
     float[] theta;
@@ -33,20 +37,32 @@ public class ESManager : MonoBehaviour
     bool running;
     Coroutine trainLoop;
 
+    public static ESManager instance;
+
     void Awake()
     {
-        masterPolicy = new LinearPolicy(inputDim, outputDim);
-        paramCount = masterPolicy.ParamCount;
-        theta = new float[paramCount];
-
         startBtn.onClick.AddListener(() =>
         {
-            if (!running) trainLoop = StartCoroutine(TrainingLoop());
+            if (!running) Init();
         });
         stopBtn.onClick.AddListener(ResetAll);
 
         popSlider.value = 50;
         UpdateGenText();
+
+        instance = this;
+    }
+
+    void Init()
+    {
+        foreach (IObservation obsProvider in obsProviders)
+            inputDim += obsProvider.Size;
+
+        masterPolicy = new LinearPolicy(inputDim, outputDim); // will be changed for more complex environments
+        paramCount = masterPolicy.ParamCount;
+        theta = new float[paramCount];
+
+        trainLoop = StartCoroutine(TrainingLoop());
     }
 
     IEnumerator TrainingLoop()
@@ -77,12 +93,13 @@ public class ESManager : MonoBehaviour
             float[] theta_i = new float[paramCount];
             for (int k = 0; k < paramCount; k++) theta_i[k] = theta[k] + sigma * epsilon[k];
 
-            IPolicy childPolicy = new LinearPolicy(inputDim, outputDim);
-            childPolicy.SetParams(theta_i);
-
             GameObject go = Instantiate(agentPrefab, agentParent);
+            foreach (var obsProvider in obsProviders)
+                go.AddComponent(obsProvider.GetType());
+            foreach (var rewProvider in rewProviders)
+                go.AddComponent(rewProvider.GetType());
             ESAgent agent = go.GetComponent<ESAgent>();
-            agent.Init(childPolicy, theta_i);
+            agent.Init(new LinearPolicy(inputDim, outputDim), theta_i); // will be changed for complex 
             population.Add(agent);
             noiseBank.Add(epsilon);
         }
