@@ -1,15 +1,19 @@
 ﻿using UnityEngine;
 
 [RequireComponent(typeof(AgentController))]
-public class ESAgent : MonoBehaviour
+public class ESAgent : MonoBehaviour, IAgentView
 {
+    public Transform Tf => transform;
+    public Rigidbody Rb { get; private set; }
+
     AgentController agentController;
-    public void Init(IPolicy _policy, float[] θ)
+    public void Init(IPolicy _policy, float[] θ, IObservation[] obs, IReward[] rews)
     {
+        Rb = GetComponent<Rigidbody>();
         policy = _policy;
         policy.SetParams(θ);
-        obsProviders = GetComponents<IObservation>();
-        rewProviders = GetComponents<IReward>();
+        obsProviders = obs;
+        rewProviders = rews;
         agentController = GetComponent<AgentController>();
 
         buffer = new float[policy.InputDim];

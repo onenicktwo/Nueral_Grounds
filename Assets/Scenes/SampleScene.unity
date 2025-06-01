@@ -1517,11 +1517,6 @@ MonoBehaviour:
   sigma: 0.1
   alpha: 0.05
   outputDim: 2
-  obsProviders:
-  - {fileID: 4811206354100253661, guid: 5f177a0f84e6e5140a2fef66e1432417, type: 3}
-  - {fileID: 8950868284369015743, guid: 5f177a0f84e6e5140a2fef66e1432417, type: 3}
-  rewProviders:
-  - {fileID: 8068549261172325820, guid: 932ee129143f04c4c865dfa53e07ecfa, type: 3}
 --- !u!1 &1928870271
 GameObject:
   m_ObjectHideFlags: 0

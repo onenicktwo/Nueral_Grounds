@@ -1,15 +1,16 @@
 using UnityEngine;
 
-public class Velocity : MonoBehaviour, IObservation
+public class Velocity : IObservation
 {
-    Rigidbody rb;
-    void Awake() => rb = GetComponent<Rigidbody>();
+    public IAgentView ag { get; set; }
     public int Size => 2;
+
+    public IObservation Clone() => new Velocity();
 
     public int Write(float[] buffer, int offset)
     {
-        buffer[offset++] = rb.velocity.x;
-        buffer[offset++] = rb.velocity.z;
+        buffer[offset++] = ag.Rb.velocity.x;
+        buffer[offset++] = ag.Rb.velocity.z;
         return offset;
     }
 }

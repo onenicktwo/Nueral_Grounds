@@ -1,17 +1,23 @@
 using UnityEngine;
 
-public class DistanceToTarget : MonoBehaviour, IObservation
+public class DistanceToTarget : IObservation
 {
-    [SerializeField] Transform target;
+    public IAgentView ag { get; set; }
+    Transform target;
     public int Size => 2;  // x,z
 
-    void Awake() => target = GameObject.FindGameObjectWithTag("Goal").transform;
+    public IObservation Clone() => new DistanceToTarget(target);
 
     public int Write(float[] buffer, int offset)
     {
-        Vector3 diff = target.position - transform.position;
+        Vector3 diff = target.position - ag.Tf.position;
         buffer[offset++] = diff.x;
         buffer[offset++] = diff.z;
         return offset;
+    }
+
+    public DistanceToTarget(Transform transform)
+    {
+        target = transform;
     }
 }

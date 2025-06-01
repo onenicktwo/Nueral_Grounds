@@ -24,8 +24,8 @@ public class ESManager : MonoBehaviour
     int inputDim = 0;
     [SerializeField]  int outputDim = 2; // for now assume only x,z movement
 
-    public MonoBehaviour[] obsProviders;
-    public MonoBehaviour[] rewProviders;
+    public List<IObservation> obsProviders = new();
+    public List<IReward> rewProviders = new();
 
     IPolicy masterPolicy;
     float[] theta;
@@ -45,12 +45,19 @@ public class ESManager : MonoBehaviour
         {
             if (!running) Init();
         });
-        stopBtn.onClick.AddListener(ResetAll);
+        stopBtn.onClick.AddListener(ResetTraining);
 
         popSlider.value = 50;
         UpdateGenText();
 
         instance = this;
+
+        // Testing a fake menu
+        DistanceToTarget distanceToTarget = new DistanceToTarget(target); // Note target can be any transform
+        obsProviders.Add(distanceToTarget);
+        obsProviders.Add(new Velocity());
+        Distance dis = new Distance(target, 0.5f, false); // Note target can be any transform
+        rewProviders.Add(dis);
     }
 
     void Init()
@@ -93,13 +100,15 @@ public class ESManager : MonoBehaviour
             float[] theta_i = new float[paramCount];
             for (int k = 0; k < paramCount; k++) theta_i[k] = theta[k] + sigma * epsilon[k];
 
+            IObservation[] obs = CloneObs();
+            IReward[] rews = CloneRews();
+
             GameObject go = Instantiate(agentPrefab, agentParent);
-            foreach (var obsProvider in obsProviders)
-                go.AddComponent(obsProvider.GetType());
-            foreach (var rewProvider in rewProviders)
-                go.AddComponent(rewProvider.GetType());
             ESAgent agent = go.GetComponent<ESAgent>();
-            agent.Init(new LinearPolicy(inputDim, outputDim), theta_i); // will be changed for complex 
+            foreach (var o in obs) o.ag = agent;
+            foreach (var r in rews) r.ag = agent;
+
+            agent.Init(new LinearPolicy(inputDim, outputDim), theta_i, obs, rews);
             population.Add(agent);
             noiseBank.Add(epsilon);
         }
@@ -152,7 +161,7 @@ public class ESManager : MonoBehaviour
         population.Clear();
     }
 
-    void ResetAll()
+    void ResetTraining()
     {
         if (trainLoop != null) StopCoroutine(trainLoop);
         Cleanup();
@@ -164,4 +173,12 @@ public class ESManager : MonoBehaviour
         UpdateGenText();
     }
     void UpdateGenText() => genText.text = $"Gen: {generation}";
+
+    IObservation[] CloneObs() =>
+    obsProviders.ConvertAll(o => o.Clone())
+                .ToArray();
+
+    IReward[] CloneRews() =>
+        rewProviders.ConvertAll(r => r.Clone())
+                    .ToArray();
 }
