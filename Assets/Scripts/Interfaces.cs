@@ -18,6 +18,7 @@ public interface IReward : IDeepClone<IReward>
     void Reset();
     void Step(out float reward);
     bool Done { get; }
+    float RewardMultiplier { get; }
 
     IAgentView ag { get; set; }
 }

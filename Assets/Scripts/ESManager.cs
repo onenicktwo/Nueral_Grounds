@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
@@ -47,7 +46,7 @@ public class ESManager : MonoBehaviour
         });
         stopBtn.onClick.AddListener(ResetTraining);
 
-        popSlider.value = 50;
+        popSlider.value = 49; // ignore this, just for testing mid amount agents
         UpdateGenText();
 
         instance = this;
@@ -56,8 +55,10 @@ public class ESManager : MonoBehaviour
         DistanceToTarget distanceToTarget = new DistanceToTarget(target); // Note target can be any transform
         obsProviders.Add(distanceToTarget);
         obsProviders.Add(new Velocity());
-        Distance dis = new Distance(target, 0.5f, false); // Note target can be any transform
+        Distance dis = new Distance(1f, target, false);
+        SphereArea sphereArea = new SphereArea(50f, target, 0.5f, false, true);
         rewProviders.Add(dis);
+        rewProviders.Add(sphereArea);
     }
 
     void Init()
@@ -68,6 +69,12 @@ public class ESManager : MonoBehaviour
         masterPolicy = new LinearPolicy(inputDim, outputDim); // will be changed for more complex environments
         paramCount = masterPolicy.ParamCount;
         theta = new float[paramCount];
+
+        // always even
+        if (popSlider.value % 2 != 0)
+        {
+            popSlider.value++;
+        }
 
         trainLoop = StartCoroutine(TrainingLoop());
     }
@@ -92,25 +99,43 @@ public class ESManager : MonoBehaviour
         population.Clear();
         noiseBank.Clear();
 
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n / 2; i++)
         {
             float[] epsilon = new float[paramCount];
+            float[] negEpsilon = new float[paramCount];
             for (int k = 0; k < paramCount; k++) epsilon[k] = Random.Range(-1f, 1f);
+            for (int k = 0; k < paramCount; k++) negEpsilon[k] = -epsilon[k];
 
-            float[] theta_i = new float[paramCount];
-            for (int k = 0; k < paramCount; k++) theta_i[k] = theta[k] + sigma * epsilon[k];
+            float[] theta_plus = new float[paramCount];
+            float[] theta_minus = new float[paramCount];
+            for (int k = 0; k < paramCount; k++)
+            {
+                theta_plus[k] = theta[k] + sigma * epsilon[k];
+                theta_minus[k] = theta[k] - sigma * epsilon[k];
+            }
 
-            IObservation[] obs = CloneObs();
-            IReward[] rews = CloneRews();
+            IObservation[] obs1 = CloneObs();
+            IReward[] rews1 = CloneRews();
+            IObservation[] obs2 = CloneObs();
+            IReward[] rews2 = CloneRews();
 
-            GameObject go = Instantiate(agentPrefab, agentParent);
-            ESAgent agent = go.GetComponent<ESAgent>();
-            foreach (var o in obs) o.ag = agent;
-            foreach (var r in rews) r.ag = agent;
-
-            agent.Init(new LinearPolicy(inputDim, outputDim), theta_i, obs, rews);
-            population.Add(agent);
+            // Agent with theta_plus
+            GameObject go1 = Instantiate(agentPrefab, agentParent);
+            ESAgent agent1 = go1.GetComponent<ESAgent>();
+            foreach (var o in obs1) o.ag = agent1;
+            foreach (var r in rews1) r.ag = agent1;
+            agent1.Init(new LinearPolicy(inputDim, outputDim), theta_plus, obs1, rews1);
+            population.Add(agent1);
             noiseBank.Add(epsilon);
+
+            // Agent with theta_minus
+            GameObject go2 = Instantiate(agentPrefab, agentParent);
+            ESAgent agent2 = go2.GetComponent<ESAgent>();
+            foreach (var o in obs2) o.ag = agent2;
+            foreach (var r in rews2) r.ag = agent2;
+            agent2.Init(new LinearPolicy(inputDim, outputDim), theta_minus, obs2, rews2);
+            population.Add(agent2);
+            noiseBank.Add(negEpsilon);
         }
     }
 
@@ -129,26 +154,26 @@ public class ESManager : MonoBehaviour
 
     void UpdateMaster()
     {
-        // canonical ES gradient estimate
         int n = population.Count;
+        float[] rewards = new float[n];
+        for (int i = 0; i < n; i++)
+            rewards[i] = population[i].CumulativeReward;
+
+        // Rank normalization to reduce outliers
+        int[] ranks = GetRanks(rewards);
+        float meanRank = (n - 1) / 2f;
+        float stdRank = Mathf.Sqrt((n * n - 1) / 12f); // equation for variance
+
         float[] grad = new float[paramCount];
-
-        // normalise returns (rank or std) – here: simple mean/std
-        float mean = 0, var = 0;
-        foreach (var a in population) mean += a.CumulativeReward;
-        mean /= n;
-        foreach (var a in population) var += Mathf.Pow(a.CumulativeReward - mean, 2);
-        float std = Mathf.Sqrt(var / n) + 1e-8f;
-
         for (int i = 0; i < n; i++)
         {
-            float normR = (population[i].CumulativeReward - mean) / std;
+            float normR = (ranks[i] - meanRank) / stdRank;
             float[] epsilon = noiseBank[i];
             for (int k = 0; k < paramCount; k++)
                 grad[k] += normR * epsilon[k];
         }
         for (int k = 0; k < paramCount; k++)
-            theta[k] += (alpha / (n * sigma)) * grad[k];   // gradient ascent step
+            theta[k] += (alpha / (n * sigma)) * grad[k];
 
         masterPolicy.SetParams(theta);
     }
@@ -172,6 +197,19 @@ public class ESManager : MonoBehaviour
 
         UpdateGenText();
     }
+
+    int[] GetRanks(float[] rewards)
+    {
+        int n = rewards.Length;
+        int[] ranks = new int[n];
+        var sorted = new List<(float reward, int idx)>();
+        for (int i = 0; i < n; i++) sorted.Add((rewards[i], i));
+        sorted.Sort((a, b) => a.reward.CompareTo(b.reward));
+        for (int rank = 0; rank < n; rank++)
+            ranks[sorted[rank].idx] = rank;
+        return ranks;
+    }
+
     void UpdateGenText() => genText.text = $"Gen: {generation}";
 
     IObservation[] CloneObs() =>

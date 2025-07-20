@@ -4,24 +4,23 @@ public class Distance: IReward
 {
     public IAgentView ag { get; set; }
     [SerializeField] Transform target;
-    Vector3 startPos;
     public bool Done { get; private set; }
-    private float radius = 0.5f;
     private int inv = 1;
+    float IReward.RewardMultiplier => rewardMultiplier;
+    private float rewardMultiplier { get; set; }
 
     public IReward Clone() =>
-        new Distance(target, radius, inv == -1);
+        new Distance(rewardMultiplier, target, inv == -1);
 
     public void Reset()
     {
         Done = false;
-        startPos = ag.Tf.position;
     }
 
-    public Distance(Transform t, float r, bool isInv)
+    public Distance(float rewardMultiplier, Transform target, bool isInv)
     {
-        target = t;
-        radius = r;
+        this.rewardMultiplier = rewardMultiplier;
+        this.target = target;
         inv = isInv ? -1 : 1;
     }
 
@@ -29,10 +28,5 @@ public class Distance: IReward
     {
         float d = Vector3.Distance(ag.Tf.position, target.position);
         r = inv * -d * Time.fixedDeltaTime;
-        if (d < radius)
-        {
-            r += 50f;
-            Done = true;
-        }
     }
 }
