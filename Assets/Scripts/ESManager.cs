@@ -84,14 +84,22 @@ public class ESManager : MonoBehaviour
         running = true;
         while (running)
         {
-            int popSize = Mathf.RoundToInt(popSlider.value);
-            SpawnPopulation(popSize);
+            SpawnPopulation((int) popSlider.value);
             yield return EvaluatePopulation();   // waits until everyone Done
             UpdateMaster(); // gradient ascent
             Cleanup();
             generation++;
             UpdateGenText();
         }
+    }
+
+    void FixedUpdate()
+    {
+        if (!running) return;
+
+        float dt = Time.fixedDeltaTime;
+        foreach (var ag in population)
+            ag.Step(dt);
     }
 
     void SpawnPopulation(int n)
@@ -122,18 +130,18 @@ public class ESManager : MonoBehaviour
             // Agent with theta_plus
             GameObject go1 = Instantiate(agentPrefab, agentParent);
             ESAgent agent1 = go1.GetComponent<ESAgent>();
+            agent1.Init(new LinearPolicy(inputDim, outputDim), theta_plus, obs1, rews1);
             foreach (var o in obs1) o.ag = agent1;
             foreach (var r in rews1) r.ag = agent1;
-            agent1.Init(new LinearPolicy(inputDim, outputDim), theta_plus, obs1, rews1);
             population.Add(agent1);
             noiseBank.Add(epsilon);
 
             // Agent with theta_minus
             GameObject go2 = Instantiate(agentPrefab, agentParent);
             ESAgent agent2 = go2.GetComponent<ESAgent>();
+            agent2.Init(new LinearPolicy(inputDim, outputDim), theta_minus, obs2, rews2);
             foreach (var o in obs2) o.ag = agent2;
             foreach (var r in rews2) r.ag = agent2;
-            agent2.Init(new LinearPolicy(inputDim, outputDim), theta_minus, obs2, rews2);
             population.Add(agent2);
             noiseBank.Add(negEpsilon);
         }

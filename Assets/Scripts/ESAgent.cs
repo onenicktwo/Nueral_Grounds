@@ -5,27 +5,8 @@ public class ESAgent : MonoBehaviour, IAgentView
 {
     public Transform Tf => transform;
     public Rigidbody Rb { get; private set; }
-
-    AgentController agentController;
-    public void Init(IPolicy _policy, float[] θ, IObservation[] obs, IReward[] rews)
-    {
-        Rb = GetComponent<Rigidbody>();
-        policy = _policy;
-        policy.SetParams(θ);
-        obsProviders = obs;
-        rewProviders = rews;
-        agentController = GetComponent<AgentController>();
-
-        buffer = new float[policy.InputDim];
-        action = new float[policy.OutputDim];
-
-        despawned = false;
-
-        foreach (var r in rewProviders) r.Reset();
-        CumulativeReward = 0;
-        Done = false;
-        timer = 0f;
-    }
+    public float CumulativeReward { get; private set; }
+    public bool Done { get; private set; }
 
     IObservation[] obsProviders;
     IReward[] rewProviders;
@@ -39,10 +20,37 @@ public class ESAgent : MonoBehaviour, IAgentView
 
     bool despawned;
 
-    public float CumulativeReward { get; private set; }
-    public bool Done { get; private set; }
+    AgentController agentController;
+    Collider[] colliders;
+    Renderer[] renderers;
 
-    void FixedUpdate()
+    void Awake()
+    {
+        Rb = GetComponent<Rigidbody>();
+        agentController = GetComponent<AgentController>();
+        colliders = GetComponentsInChildren<Collider>();
+        renderers = GetComponentsInChildren<Renderer>();
+    }
+
+    public void Init(IPolicy _policy, float[] theta, IObservation[] obs, IReward[] rews)
+    {
+        policy = _policy;
+        policy.SetParams(theta);
+        obsProviders = obs;
+        rewProviders = rews;
+
+        buffer = new float[policy.InputDim];
+        action = new float[policy.OutputDim];
+
+        despawned = false;
+
+        foreach (var r in rewProviders) r.Reset();
+        CumulativeReward = 0;
+        Done = false;
+        timer = 0f;
+    }
+
+    public void Step(float dt)
     {
         if (Done) return;
 
@@ -66,13 +74,14 @@ public class ESAgent : MonoBehaviour, IAgentView
             if (r.Done)
             {
                 Done = true;
-                Despawn();
             }
         }
 
-        timer += Time.fixedDeltaTime;
+        timer += dt;
         if (timer > MaxEpisodeTime)
             Done = true;
+
+        if(Done) Despawn();
     }
 
     void Despawn()
@@ -80,15 +89,14 @@ public class ESAgent : MonoBehaviour, IAgentView
         if (despawned) return;
         despawned = true;
 
-        var rb = GetComponent<Rigidbody>();
-        rb.velocity = rb.angularVelocity = Vector3.zero;
-        rb.isKinematic = true;
+        Rb.velocity = Rb.angularVelocity = Vector3.zero;
+        Rb.isKinematic = true;
 
         agentController.enabled = false;
 
-        foreach (var ren in GetComponentsInChildren<Renderer>())
+        foreach (var ren in renderers)
             ren.enabled = false;
-        foreach (var col in GetComponentsInChildren<Collider>())
+        foreach (var col in colliders)
             col.enabled = false;
     }
 }
