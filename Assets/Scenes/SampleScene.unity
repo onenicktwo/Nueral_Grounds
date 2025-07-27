@@ -206,7 +206,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 2008399687}
   m_Direction: 0
   m_MinValue: 1
-  m_MaxValue: 100
+  m_MaxValue: 512
   m_WholeNumbers: 1
   m_Value: 1
   m_OnValueChanged:
@@ -880,7 +880,7 @@ Camera:
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 119
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0

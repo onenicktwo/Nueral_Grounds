@@ -24,6 +24,9 @@ public class ESAgent : MonoBehaviour, IAgentView
     Collider[] colliders;
     Renderer[] renderers;
 
+    const int ActiveLayer = 6;
+    const int PooledLayer = 7;
+
     void Awake()
     {
         Rb = GetComponent<Rigidbody>();
@@ -41,8 +44,6 @@ public class ESAgent : MonoBehaviour, IAgentView
 
         buffer = new float[policy.InputDim];
         action = new float[policy.OutputDim];
-
-        despawned = false;
 
         foreach (var r in rewProviders) r.Reset();
         CumulativeReward = 0;
@@ -84,19 +85,22 @@ public class ESAgent : MonoBehaviour, IAgentView
         if(Done) Despawn();
     }
 
-    void Despawn()
+    public void Despawn()
     {
         if (despawned) return;
         despawned = true;
 
-        Rb.velocity = Rb.angularVelocity = Vector3.zero;
-        Rb.isKinematic = true;
-
         agentController.enabled = false;
+        gameObject.layer = PooledLayer;
 
-        foreach (var ren in renderers)
-            ren.enabled = false;
-        foreach (var col in colliders)
-            col.enabled = false;
+        Rb.velocity = Rb.angularVelocity = Tf.position = Vector3.zero;
+    }
+
+    public void Respawn()
+    {
+        despawned = false;
+
+        agentController.enabled = true;
+        gameObject.layer = ActiveLayer;
     }
 }

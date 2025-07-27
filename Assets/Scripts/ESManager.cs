@@ -18,16 +18,17 @@ public class ESManager : MonoBehaviour
     [SerializeField] Transform target;
 
     [Header("Hyper-parameters")]
-    [SerializeField] float sigma = 0.1f;         // exploration noise
+    [SerializeField] float sigma = 0.01f;         // exploration noise
     [SerializeField] float alpha = 0.05f;        // learning-rate
     int inputDim = 0;
     [SerializeField]  int outputDim = 2; // for now assume only x,z movement
 
     public List<IObservation> obsProviders = new();
     public List<IReward> rewProviders = new();
+    private Queue<ESAgent> availableAgents = new();
 
     IPolicy masterPolicy;
-    float[] theta;
+    float[] masterTheta;
     int paramCount;
     readonly List<ESAgent> population = new();
     readonly List<float[]> noiseBank = new();
@@ -52,13 +53,20 @@ public class ESManager : MonoBehaviour
         instance = this;
 
         // Testing a fake menu
-        DistanceToTarget distanceToTarget = new DistanceToTarget(target); // Note target can be any transform
+        DistanceToTarget distanceToTarget = new DistanceToTarget(target);
         obsProviders.Add(distanceToTarget);
         obsProviders.Add(new Velocity());
         Distance dis = new Distance(1f, target, false);
         SphereArea sphereArea = new SphereArea(50f, target, 0.5f, false, true);
         rewProviders.Add(dis);
         rewProviders.Add(sphereArea);
+
+        for (int i = 0; i < popSlider.maxValue; i++)
+        {
+            GameObject go = Instantiate(agentPrefab, agentParent);
+            ESAgent agent = go.GetComponent<ESAgent>();
+            ReturnToPool(agent);
+        }
     }
 
     void Init()
@@ -68,7 +76,7 @@ public class ESManager : MonoBehaviour
 
         masterPolicy = new LinearPolicy(inputDim, outputDim); // will be changed for more complex environments
         paramCount = masterPolicy.ParamCount;
-        theta = new float[paramCount];
+        masterTheta = new float[paramCount];
 
         // always even
         if (popSlider.value % 2 != 0)
@@ -85,8 +93,8 @@ public class ESManager : MonoBehaviour
         while (running)
         {
             SpawnPopulation((int) popSlider.value);
-            yield return EvaluatePopulation();   // waits until everyone Done
-            UpdateMaster(); // gradient ascent
+            yield return EvaluatePopulation(); // waits until everyone Done
+            UpdateMaster();
             Cleanup();
             generation++;
             UpdateGenText();
@@ -111,34 +119,32 @@ public class ESManager : MonoBehaviour
         {
             float[] epsilon = new float[paramCount];
             float[] negEpsilon = new float[paramCount];
-            for (int k = 0; k < paramCount; k++) epsilon[k] = Random.Range(-1f, 1f);
-            for (int k = 0; k < paramCount; k++) negEpsilon[k] = -epsilon[k];
+            for (int k = 0; k < paramCount; k++)
+            {
+                epsilon[k] = Random.Range(-1f, 1f);
+                negEpsilon[k] = -epsilon[k];
+            }
 
             float[] theta_plus = new float[paramCount];
             float[] theta_minus = new float[paramCount];
             for (int k = 0; k < paramCount; k++)
             {
-                theta_plus[k] = theta[k] + sigma * epsilon[k];
-                theta_minus[k] = theta[k] - sigma * epsilon[k];
+                theta_plus[k] = masterTheta[k] + sigma * epsilon[k];
+                theta_minus[k] = masterTheta[k] + sigma * negEpsilon[k];
             }
 
             IObservation[] obs1 = CloneObs();
             IReward[] rews1 = CloneRews();
-            IObservation[] obs2 = CloneObs();
-            IReward[] rews2 = CloneRews();
-
-            // Agent with theta_plus
-            GameObject go1 = Instantiate(agentPrefab, agentParent);
-            ESAgent agent1 = go1.GetComponent<ESAgent>();
+            ESAgent agent1 = GetAgentFromPool();
             agent1.Init(new LinearPolicy(inputDim, outputDim), theta_plus, obs1, rews1);
             foreach (var o in obs1) o.ag = agent1;
             foreach (var r in rews1) r.ag = agent1;
             population.Add(agent1);
             noiseBank.Add(epsilon);
 
-            // Agent with theta_minus
-            GameObject go2 = Instantiate(agentPrefab, agentParent);
-            ESAgent agent2 = go2.GetComponent<ESAgent>();
+            IObservation[] obs2 = CloneObs();
+            IReward[] rews2 = CloneRews();
+            ESAgent agent2 = GetAgentFromPool();
             agent2.Init(new LinearPolicy(inputDim, outputDim), theta_minus, obs2, rews2);
             foreach (var o in obs2) o.ag = agent2;
             foreach (var r in rews2) r.ag = agent2;
@@ -181,15 +187,15 @@ public class ESManager : MonoBehaviour
                 grad[k] += normR * epsilon[k];
         }
         for (int k = 0; k < paramCount; k++)
-            theta[k] += (alpha / (n * sigma)) * grad[k];
+            masterTheta[k] += (alpha / (n * sigma)) * grad[k];
 
-        masterPolicy.SetParams(theta);
+        masterPolicy.SetParams(masterTheta);
     }
 
     void Cleanup()
     {
-        foreach (var a in population)
-            Destroy(a.gameObject);
+        foreach (ESAgent ag in population)
+            ReturnToPool(ag);
         noiseBank.Clear();
         population.Clear();
     }
@@ -200,10 +206,23 @@ public class ESManager : MonoBehaviour
         Cleanup();
         running = false;
         generation = 0;
-        theta = new float[paramCount];
-        masterPolicy.SetParams(theta);
+        masterTheta = new float[paramCount];
+        masterPolicy.SetParams(masterTheta);
 
         UpdateGenText();
+    }
+
+    ESAgent GetAgentFromPool()
+    {
+        ESAgent ag = availableAgents.Dequeue();
+        ag.Respawn();
+        return ag;
+    }
+
+    void ReturnToPool(ESAgent ag)
+    {
+        ag.Despawn();
+        availableAgents.Enqueue(ag);
     }
 
     int[] GetRanks(float[] rewards)
