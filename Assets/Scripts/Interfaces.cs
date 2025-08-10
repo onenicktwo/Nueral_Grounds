@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public interface IObservation : IDeepClone<IObservation>
@@ -39,9 +40,19 @@ public interface IAgentView
 {
     Transform Tf { get; }
     Rigidbody Rb { get; }
+    void Respawn();
+    void Despawn();
 }
 
 public interface IDeepClone<T>
 {
     T Clone();
+}
+
+public interface Algorithm
+{
+    void StartTraining(int populationSize);
+    void StopTraining();
+
+    event Action<int> OnGenerationFinished;
 }
