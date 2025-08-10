@@ -1,17 +1,11 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using Random = UnityEngine.Random;
 
-public class ESManager : MonoBehaviour
+public class ESManager : MonoBehaviour, Algorithm
 {
-    [Header("UI")]
-    [SerializeField] Button startBtn;
-    [SerializeField] Button stopBtn;
-    [SerializeField] Slider popSlider;
-    [SerializeField] Text genText;
-
     [Header("References")]
     [SerializeField] GameObject agentPrefab; // Not an actual prefab, but acts like one
     [SerializeField] Transform agentParent;
@@ -34,24 +28,14 @@ public class ESManager : MonoBehaviour
     readonly List<float[]> noiseBank = new();
 
     int generation;
-    bool running;
+    bool isRunning;
     Coroutine trainLoop;
+    int popSize;
 
-    public static ESManager instance;
+    public event Action<int> OnGenerationFinished;
 
     void Awake()
     {
-        startBtn.onClick.AddListener(() =>
-        {
-            if (!running) Init();
-        });
-        stopBtn.onClick.AddListener(ResetTraining);
-
-        popSlider.value = 49; // ignore this, just for testing mid amount agents
-        UpdateGenText();
-
-        instance = this;
-
         // Testing a fake menu
         DistanceToTarget distanceToTarget = new DistanceToTarget(target);
         obsProviders.Add(distanceToTarget);
@@ -61,12 +45,31 @@ public class ESManager : MonoBehaviour
         rewProviders.Add(dis);
         rewProviders.Add(sphereArea);
 
-        for (int i = 0; i < popSlider.maxValue; i++)
+        for (int i = 0; i < GameManager.I.maxAgents; i++)
         {
             GameObject go = Instantiate(agentPrefab, agentParent);
             ESAgent agent = go.GetComponent<ESAgent>();
             ReturnToPool(agent);
         }
+    }
+
+    public void StartTraining(int populationSize)
+    {
+        if (isRunning) return;
+        popSize = populationSize;
+        if (populationSize % 2 != 0) popSize++;
+        Init();
+        trainLoop = StartCoroutine(TrainingLoop());
+    }
+
+    public void StopTraining()
+    {
+        if (trainLoop != null) StopCoroutine(trainLoop);
+        Cleanup();
+        isRunning = false;
+        generation = 0;
+        masterTheta = new float[paramCount];
+        masterPolicy.SetParams(masterTheta);
     }
 
     void Init()
@@ -77,33 +80,25 @@ public class ESManager : MonoBehaviour
         masterPolicy = new LinearPolicy(inputDim, outputDim); // will be changed for more complex environments
         paramCount = masterPolicy.ParamCount;
         masterTheta = new float[paramCount];
-
-        // always even
-        if (popSlider.value % 2 != 0)
-        {
-            popSlider.value++;
-        }
-
-        trainLoop = StartCoroutine(TrainingLoop());
     }
 
     IEnumerator TrainingLoop()
     {
-        running = true;
-        while (running)
+        isRunning = true;
+        while (isRunning)
         {
-            SpawnPopulation((int) popSlider.value);
+            SpawnPopulation(popSize);
             yield return EvaluatePopulation(); // waits until everyone Done
             UpdateMaster();
             Cleanup();
             generation++;
-            UpdateGenText();
+            OnGenerationFinished?.Invoke(generation);
         }
     }
 
     void FixedUpdate()
     {
-        if (!running) return;
+        if (!isRunning) return;
 
         float dt = Time.fixedDeltaTime;
         foreach (var ag in population)
@@ -200,18 +195,6 @@ public class ESManager : MonoBehaviour
         population.Clear();
     }
 
-    void ResetTraining()
-    {
-        if (trainLoop != null) StopCoroutine(trainLoop);
-        Cleanup();
-        running = false;
-        generation = 0;
-        masterTheta = new float[paramCount];
-        masterPolicy.SetParams(masterTheta);
-
-        UpdateGenText();
-    }
-
     ESAgent GetAgentFromPool()
     {
         ESAgent ag = availableAgents.Dequeue();
@@ -236,8 +219,6 @@ public class ESManager : MonoBehaviour
             ranks[sorted[rank].idx] = rank;
         return ranks;
     }
-
-    void UpdateGenText() => genText.text = $"Gen: {generation}";
 
     IObservation[] CloneObs() =>
     obsProviders.ConvertAll(o => o.Clone())
