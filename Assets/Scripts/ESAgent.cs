@@ -90,17 +90,20 @@ public class ESAgent : MonoBehaviour, IAgentView
         if (despawned) return;
         despawned = true;
 
-        agentController.enabled = false;
-        gameObject.layer = PooledLayer;
-
         Rb.velocity = Rb.angularVelocity = Tf.position = Vector3.zero;
+        Rb.isKinematic = true;
+        foreach (var c in colliders) c.enabled = false;
+        foreach (var r in renderers) r.enabled = false;
+        agentController.enabled = false;
     }
 
     public void Respawn()
     {
         despawned = false;
 
+        Rb.isKinematic = false;
+        foreach (var c in colliders) c.enabled = true;
+        foreach (var r in renderers) r.enabled = true;
         agentController.enabled = true;
-        gameObject.layer = ActiveLayer;
     }
 }

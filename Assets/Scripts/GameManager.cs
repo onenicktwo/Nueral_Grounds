@@ -9,8 +9,7 @@ public class GameManager : MonoBehaviour
 
     public static GameManager I;
 
-    [SerializeField]
-    public GameState state;
+    private GameState state;
 
     [SerializeField]
     public Algorithm algorithmManager;
