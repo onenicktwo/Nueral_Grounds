@@ -21,18 +21,15 @@ public class ESAgent : MonoBehaviour, IAgentView
     bool despawned;
 
     AgentController agentController;
-    Collider[] colliders;
-    Renderer[] renderers;
-
-    const int ActiveLayer = 6;
-    const int PooledLayer = 7;
+    Collider coll;
+    Renderer rend;
 
     void Awake()
     {
         Rb = GetComponent<Rigidbody>();
         agentController = GetComponent<AgentController>();
-        colliders = GetComponentsInChildren<Collider>();
-        renderers = GetComponentsInChildren<Renderer>();
+        coll = GetComponent<Collider>();
+        rend = GetComponent<Renderer>();
     }
 
     public void Init(IPolicy _policy, float[] theta, IObservation[] obs, IReward[] rews)
@@ -92,8 +89,8 @@ public class ESAgent : MonoBehaviour, IAgentView
 
         Rb.velocity = Rb.angularVelocity = Tf.position = Vector3.zero;
         Rb.isKinematic = true;
-        foreach (var c in colliders) c.enabled = false;
-        foreach (var r in renderers) r.enabled = false;
+        coll.enabled = false;
+        rend.enabled = false;
         agentController.enabled = false;
     }
 
@@ -102,8 +99,8 @@ public class ESAgent : MonoBehaviour, IAgentView
         despawned = false;
 
         Rb.isKinematic = false;
-        foreach (var c in colliders) c.enabled = true;
-        foreach (var r in renderers) r.enabled = true;
+        coll.enabled = true;
+        rend.enabled = true;
         agentController.enabled = true;
     }
 }
