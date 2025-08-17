@@ -256,8 +256,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5639de10be9bf1b45b0eb145f9929ec4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  state: 0
-  maxAgents: 1000
+  maxAgents: 1024
 --- !u!1 &355035084
 GameObject:
   m_ObjectHideFlags: 0
@@ -1576,6 +1575,7 @@ MonoBehaviour:
   sigma: 0.1
   alpha: 0.05
   outputDim: 2
+  trainingTimeScale: 5
 --- !u!1 &1928870271
 GameObject:
   m_ObjectHideFlags: 0

@@ -34,6 +34,10 @@ public class ESManager : MonoBehaviour, Algorithm
 
     public event Action<int> OnGenerationFinished;
 
+    [SerializeField]
+    private float trainingTimeScale = 5f;
+    float prevTimeScale;
+
     void Awake()
     {
         // Testing a fake menu
@@ -44,6 +48,9 @@ public class ESManager : MonoBehaviour, Algorithm
         SphereArea sphereArea = new SphereArea(50f, target, 0.5f, false, true);
         rewProviders.Add(dis);
         rewProviders.Add(sphereArea);
+
+        prevTimeScale = Time.timeScale;
+        Time.timeScale = trainingTimeScale;
 
         for (int i = 0; i < GameManager.I.maxAgents; i++)
         {
@@ -70,6 +77,7 @@ public class ESManager : MonoBehaviour, Algorithm
         generation = 0;
         masterTheta = new float[paramCount];
         masterPolicy.SetParams(masterTheta);
+        Time.timeScale = prevTimeScale;
     }
 
     void Init()
