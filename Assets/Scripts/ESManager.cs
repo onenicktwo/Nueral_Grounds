@@ -16,6 +16,7 @@ public class ESManager : MonoBehaviour, Algorithm
     [SerializeField] float alpha = 0.05f;        // learning-rate
     int inputDim = 0;
     [SerializeField]  int outputDim = 2; // for now assume only x,z movement
+    [SerializeField] int hiddenDim = 20; // only used for NN policies
 
     public List<IObservation> obsProviders = new();
     public List<IReward> rewProviders = new();
@@ -85,7 +86,7 @@ public class ESManager : MonoBehaviour, Algorithm
         foreach (IObservation obsProvider in obsProviders)
             inputDim += obsProvider.Size;
 
-        masterPolicy = new LinearPolicy(inputDim, outputDim); // will be changed for more complex environments
+        masterPolicy = new NeuralNetworkPolicy(inputDim, outputDim, hiddenDim);
         paramCount = masterPolicy.ParamCount;
         masterTheta = new float[paramCount];
     }
@@ -139,7 +140,7 @@ public class ESManager : MonoBehaviour, Algorithm
             IObservation[] obs1 = CloneObs();
             IReward[] rews1 = CloneRews();
             ESAgent agent1 = GetAgentFromPool();
-            agent1.Init(new LinearPolicy(inputDim, outputDim), theta_plus, obs1, rews1);
+            agent1.Init(new NeuralNetworkPolicy(inputDim, outputDim, hiddenDim), theta_plus, obs1, rews1);
             foreach (var o in obs1) o.ag = agent1;
             foreach (var r in rews1) r.ag = agent1;
             population.Add(agent1);
@@ -148,7 +149,7 @@ public class ESManager : MonoBehaviour, Algorithm
             IObservation[] obs2 = CloneObs();
             IReward[] rews2 = CloneRews();
             ESAgent agent2 = GetAgentFromPool();
-            agent2.Init(new LinearPolicy(inputDim, outputDim), theta_minus, obs2, rews2);
+            agent2.Init(new NeuralNetworkPolicy(inputDim, outputDim, hiddenDim), theta_minus, obs2, rews2);
             foreach (var o in obs2) o.ag = agent2;
             foreach (var r in rews2) r.ag = agent2;
             population.Add(agent2);
