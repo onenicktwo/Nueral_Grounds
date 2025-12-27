@@ -1575,6 +1575,7 @@ MonoBehaviour:
   sigma: 0.1
   alpha: 0.05
   outputDim: 2
+  hiddenDim: 20
   trainingTimeScale: 5
 --- !u!1 &1928870271
 GameObject:

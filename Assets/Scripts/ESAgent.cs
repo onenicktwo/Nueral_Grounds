@@ -11,13 +11,11 @@ public class ESAgent : MonoBehaviour, IAgentView
     IObservation[] obsProviders;
     IReward[] rewProviders;
     IPolicy policy;
-
     float[] buffer;
     float[] action;
 
     const float MaxEpisodeTime = 3f;
     float timer;
-
     bool despawned;
 
     AgentController agentController;
@@ -32,17 +30,35 @@ public class ESAgent : MonoBehaviour, IAgentView
         rend = GetComponent<Renderer>();
     }
 
-    public void Init(IPolicy _policy, float[] theta, IObservation[] obs, IReward[] rews)
+    // Called one when Start Training is clicked
+    public void ConfigureAgent(IPolicy _policy, IObservation[] _obs, IReward[] _rews)
     {
         policy = _policy;
+        obsProviders = _obs;
+        rewProviders = _rews;
+
+        if (buffer == null || buffer.Length != policy.InputDim)
+            buffer = new float[policy.InputDim];
+
+        if (action == null || action.Length != policy.OutputDim)
+            action = new float[policy.OutputDim];
+
+        foreach (var o in obsProviders) o.ag = this;
+        foreach (var r in rewProviders) r.ag = this;
+    }
+
+    // Called every generation
+    public void PrepareForRun(float[] theta)
+    {
+        // Inject new weights into existing brain
         policy.SetParams(theta);
-        obsProviders = obs;
-        rewProviders = rews;
 
-        buffer = new float[policy.InputDim];
-        action = new float[policy.OutputDim];
-
+        // Reset sensors/rewards
         foreach (var r in rewProviders) r.Reset();
+
+        // If observations have state, reset them here too
+        // foreach (var o in obsProviders) o.Reset();
+
         CumulativeReward = 0;
         Done = false;
         timer = 0f;
@@ -60,19 +76,16 @@ public class ESAgent : MonoBehaviour, IAgentView
         // 2) Policy -> action
         policy.Act(buffer, action);
 
-        // 3) Feed to locomotion / animation
+        // 3) Feed to locomotion
         Vector3 dir = new Vector3(action[0], 0, action[1]).normalized;
         agentController.DesiredDirection = dir;
 
-        // 4) Rewards & termination
+        // 4) Rewards and termination
         foreach (var r in rewProviders)
         {
             r.Step(out var rwd);
             CumulativeReward += rwd;
-            if (r.Done)
-            {
-                Done = true;
-            }
+            if (r.Done) Done = true;
         }
 
         timer += dt;
@@ -97,7 +110,6 @@ public class ESAgent : MonoBehaviour, IAgentView
     public void Respawn()
     {
         despawned = false;
-
         Rb.isKinematic = false;
         coll.enabled = true;
         rend.enabled = true;

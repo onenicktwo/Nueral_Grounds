@@ -20,11 +20,13 @@ public class ESManager : MonoBehaviour, Algorithm
 
     public List<IObservation> obsProviders = new();
     public List<IReward> rewProviders = new();
-    private Queue<ESAgent> availableAgents = new();
 
     IPolicy masterPolicy;
     float[] masterTheta;
     int paramCount;
+
+    private List<ESAgent> allAgents = new List<ESAgent>();
+    private Queue<ESAgent> availableAgents = new();
     readonly List<ESAgent> population = new();
     readonly List<float[]> noiseBank = new();
 
@@ -42,21 +44,18 @@ public class ESManager : MonoBehaviour, Algorithm
     void Awake()
     {
         // Testing a fake menu
-        DistanceToTarget distanceToTarget = new DistanceToTarget(target);
-        obsProviders.Add(distanceToTarget);
+        obsProviders.Add(new DistanceToTarget(target));
         obsProviders.Add(new Velocity());
-        Distance dis = new Distance(1f, target, false);
-        SphereArea sphereArea = new SphereArea(50f, target, 0.5f, false, true);
-        rewProviders.Add(dis);
-        rewProviders.Add(sphereArea);
+        rewProviders.Add(new Distance(1f, target, false));
+        rewProviders.Add(new SphereArea(50f, target, 0.5f, false, true));
 
         prevTimeScale = Time.timeScale;
-        Time.timeScale = trainingTimeScale;
 
         for (int i = 0; i < GameManager.I.maxAgents; i++)
         {
             GameObject go = Instantiate(agentPrefab, agentParent);
             ESAgent agent = go.GetComponent<ESAgent>();
+            allAgents.Add(agent);
             ReturnToPool(agent);
         }
     }
@@ -64,9 +63,12 @@ public class ESManager : MonoBehaviour, Algorithm
     public void StartTraining(int populationSize)
     {
         if (isRunning) return;
+
         popSize = populationSize;
         if (populationSize % 2 != 0) popSize++;
-        Init();
+
+        InitializeTrainingSession();
+
         trainLoop = StartCoroutine(TrainingLoop());
     }
 
@@ -76,19 +78,30 @@ public class ESManager : MonoBehaviour, Algorithm
         Cleanup();
         isRunning = false;
         generation = 0;
-        masterTheta = new float[paramCount];
-        masterPolicy.SetParams(masterTheta);
+        masterTheta = null;
         Time.timeScale = prevTimeScale;
     }
 
-    void Init()
+    void InitializeTrainingSession()
     {
-        foreach (IObservation obsProvider in obsProviders)
-            inputDim += obsProvider.Size;
+        inputDim = 0;
+        foreach (IObservation obs in obsProviders)
+            inputDim += obs.Size;
 
         masterPolicy = new NeuralNetworkPolicy(inputDim, outputDim, hiddenDim);
         paramCount = masterPolicy.ParamCount;
         masterTheta = new float[paramCount];
+
+        foreach (ESAgent agent in allAgents)
+        {
+            agent.ConfigureAgent(
+                new NeuralNetworkPolicy(inputDim, outputDim, hiddenDim),
+                CloneObs(),
+                CloneRews()
+            );
+        }
+
+        Time.timeScale = trainingTimeScale;
     }
 
     IEnumerator TrainingLoop()
@@ -137,29 +150,24 @@ public class ESManager : MonoBehaviour, Algorithm
                 theta_minus[k] = masterTheta[k] + sigma * negEpsilon[k];
             }
 
-            IObservation[] obs1 = CloneObs();
-            IReward[] rews1 = CloneRews();
-            ESAgent agent1 = GetAgentFromPool();
-            agent1.Init(new NeuralNetworkPolicy(inputDim, outputDim, hiddenDim), theta_plus, obs1, rews1);
-            foreach (var o in obs1) o.ag = agent1;
-            foreach (var r in rews1) r.ag = agent1;
-            population.Add(agent1);
-            noiseBank.Add(epsilon);
+            CreateAgent(theta_plus, epsilon);
 
-            IObservation[] obs2 = CloneObs();
-            IReward[] rews2 = CloneRews();
-            ESAgent agent2 = GetAgentFromPool();
-            agent2.Init(new NeuralNetworkPolicy(inputDim, outputDim, hiddenDim), theta_minus, obs2, rews2);
-            foreach (var o in obs2) o.ag = agent2;
-            foreach (var r in rews2) r.ag = agent2;
-            population.Add(agent2);
-            noiseBank.Add(negEpsilon);
+            CreateAgent(theta_minus, negEpsilon);
         }
+    }
+
+    void CreateAgent(float[] theta, float[] noiseStored)
+    {
+        ESAgent ag = GetAgentFromPool();
+
+        ag.PrepareForRun(theta);
+
+        population.Add(ag);
+        noiseBank.Add(noiseStored);
     }
 
     IEnumerator EvaluatePopulation()
     {
-        // naive: just wait until every agent signals Done
         bool allDone;
         do
         {
@@ -192,14 +200,13 @@ public class ESManager : MonoBehaviour, Algorithm
         }
         for (int k = 0; k < paramCount; k++)
             masterTheta[k] += (alpha / (n * sigma)) * grad[k];
-
-        masterPolicy.SetParams(masterTheta);
     }
 
     void Cleanup()
     {
         foreach (ESAgent ag in population)
             ReturnToPool(ag);
+
         noiseBank.Clear();
         population.Clear();
     }
